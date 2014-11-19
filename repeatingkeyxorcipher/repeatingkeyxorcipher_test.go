@@ -29,14 +29,21 @@ func TestMetasanoRepeatingKeyXORCipher(t *testing.T) {
 	}
 }
 
+// This test is for debugging assignment
+// 6. "Break repeating-key XOR".
+// Here we create the flow manually so that we know
+// where the process goes wrong.
+// Running the transpose guess part manually,
+// the fault is in the keysize guess part
+// and return too high normalized distance
+// for the correct key size.
 func TestRepeatingKeyXORCipherForBreaking(t *testing.T) {
-	// base64-encoded repeating-key XOR
-	const input = "Burning 'em, if you ain't quick and nimble\n" +
+	const plain = "Burning 'em, if you ain't quick and nimble\n" +
 		"I go crazy when I hear a cymbal"
 	const key = "ICE"
 	const expected = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f"
 
-	inbytes, _ := hex.DecodeString(fmt.Sprintf("%x", input))
+	inbytes, _ := hex.DecodeString(fmt.Sprintf("%x", plain))
 	keybytes, _ := hex.DecodeString(fmt.Sprintf("%x", key))
 
 	out := EncodeRepeatingKeyXORCipher(inbytes, keybytes)
@@ -45,25 +52,37 @@ func TestRepeatingKeyXORCipherForBreaking(t *testing.T) {
 	}
 
 	base64bytes := base64.ConvertToBase64(out)
-	fmt.Println(fmt.Sprintf("%s", base64bytes))
 
 	// Starting to backtrack
 	cipherBytes := base64.ConvertFromBase64(base64bytes)
 
 	// test the keysize guessing
+	leastDistance := float32(math.MaxFloat32)
+	leastKeysize := -1
 	for keysize := 2; keysize < 20; keysize++ {
 		sliceA := cipherBytes[:keysize]
 		sliceB := cipherBytes[keysize : 2*keysize]
-		distance, err := CalculateDistance(sliceA, sliceB)
-		if err != nil || distance < 0 {
-			t.Fatal(distance, err)
+		sliceC := cipherBytes[2*keysize : 3*keysize]
+		sliceD := cipherBytes[3*keysize : 4*keysize]
+		distance1, _ := CalculateDistance(sliceA, sliceB)
+		distance2, _ := CalculateDistance(sliceB, sliceC)
+		distance3, _ := CalculateDistance(sliceC, sliceD)
+
+		normalizedDistance := float32(distance1+distance2+distance3) / float32(3*keysize)
+		fmt.Printf("keysize %2v gives dist %v\n", keysize, normalizedDistance)
+
+		if normalizedDistance < leastDistance {
+			leastDistance = normalizedDistance
+			leastKeysize = keysize
 		}
-		normalizedDistance := float32(distance) / float32(keysize)
-		fmt.Printf("keysize %v gives dist %v\n", keysize, normalizedDistance)
 	}
+
 	// --> gives high number for the correct value
-	// lock the correct keysize
-	leastKeysize := 3
+	// lock the correct keysize to test the remaining part
+	if leastKeysize != 3 {
+		t.Error("failed to find the correct keysize 3, got", leastKeysize)
+		leastKeysize = 3
+	}
 
 	transpose := make(map[int][]byte)
 	for i, v := range cipherBytes {
@@ -87,13 +106,9 @@ func TestRepeatingKeyXORCipherForBreaking(t *testing.T) {
 
 	plainBytes := EncodeRepeatingKeyXORCipher(cipherBytes, repeatingKey)
 	plainText := fmt.Sprintf("%s", plainBytes)
-	//fmt.Printf("%v vs %v", input, plainText)
-	if input != plainText {
+	if plain != plainText {
 		t.Fatal("plain text mismatch")
 	}
-
-	t.Fatal("BOOM")
-
 }
 
 // 6. Break repeating-key XOR
@@ -128,14 +143,27 @@ func TestMetasanoBreakRepeatingKeyXORCipher(t *testing.T) {
 	//fmt.Printf("len cipherBytes = %v \n", len(cipherBytes))
 
 	for keysize := 2; keysize < 40; keysize++ {
+
 		sliceA := cipherBytes[:keysize]
 		sliceB := cipherBytes[keysize : 2*keysize]
-		distance, err := CalculateDistance(sliceA, sliceB)
-		if err != nil || distance < 0 {
-			t.Fatal(distance, err)
-		}
-		normalizedDistance := float32(distance) / float32(keysize)
+		sliceC := cipherBytes[2*keysize : 3*keysize]
+		sliceD := cipherBytes[3*keysize : 4*keysize]
+		distance1, _ := CalculateDistance(sliceA, sliceB)
+		distance2, _ := CalculateDistance(sliceB, sliceC)
+		distance3, _ := CalculateDistance(sliceC, sliceD)
+		normalizedDistance := float32(distance1+distance2+distance3) / float32(3*keysize)
 		fmt.Printf("keysize %v gives dist %v\n", keysize, normalizedDistance)
+
+		/*
+			sliceA := cipherBytes[:keysize]
+			sliceB := cipherBytes[keysize : 2*keysize]
+			distance, err := CalculateDistance(sliceA, sliceB)
+			if err != nil || distance < 0 {
+				t.Fatal(distance, err)
+			}
+			normalizedDistance := float32(distance) / float32(keysize)
+			fmt.Printf("keysize %v gives dist %v\n", keysize, normalizedDistance)
+		*/
 
 		if normalizedDistance < leastDistance {
 			leastDistance = normalizedDistance
@@ -147,6 +175,9 @@ func TestMetasanoBreakRepeatingKeyXORCipher(t *testing.T) {
 	}
 	fmt.Printf("found keysize %v with dist %v\n", leastKeysize, leastDistance)
 
+	if leastKeysize != 29 {
+		t.Fatal("failed to find the correct keysize 29, got", leastKeysize)
+	}
 	//e. Now that you probably know the KEYSIZE: break the ciphertext into
 	//blocks of KEYSIZE length.
 
