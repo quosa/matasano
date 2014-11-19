@@ -1,0 +1,19 @@
+readme for matasano assignments in go
+
+To run the assignment tests do this:
+
+1. set up prerequisites:
+	$ go version
+	go1.3.1 darwin/amd64
+	 - go1.3.3.darwin-amd64-osx10.8.pkg from http://golang.org/dl/
+	$ git --version
+	git version 1.9.3 (Apple Git-50)
+	 - comes with xcode from AppStore
+2. set up a Go workspace:
+	mkdir matasano_goworkspace
+	cd matasano_goworkspace
+	export GOPATH=`pwd`
+3. get the code
+	go get github.com/quosa/matasano
+4. run all the tests
+	go test github.com/quosa/matasano/...
