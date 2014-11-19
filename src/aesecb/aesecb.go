@@ -1,6 +1,9 @@
 package aesecb
 
-import "crypto/aes"
+import (
+	"bytes"
+	"crypto/aes"
+)
 
 // Go left out AES ECB because it is insecure
 // https://code.google.com/p/go/issues/detail?id=5597
@@ -18,4 +21,19 @@ func DecryptAES128ECB(cipher, key []byte) []byte {
 		plain = append(plain, block...)
 	}
 	return plain
+}
+
+func DetectAES128ECBCipher(cipher []byte) bool {
+	verdict := false
+	start := 0
+	end := 16
+	for end < len(cipher) {
+		duplicationCount := bytes.Count(cipher, cipher[start:end])
+		if duplicationCount > 1 {
+			verdict = true
+		}
+		start += 16
+		end += 16
+	}
+	return verdict
 }
