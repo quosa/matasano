@@ -3,13 +3,13 @@ package repeatingkeyxorcipher
 import (
 	"../base64"
 	"../singlecharxorcipher"
-	//"encoding/base64"
 	"bufio"
 	"bytes"
 	"encoding/hex"
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -76,9 +76,11 @@ func TestRepeatingKeyXORCipherForBreaking(t *testing.T) {
 			leastKeysize = keysize
 		}
 	}
+	fmt.Printf("found keysize %v with dist %v\n", leastKeysize, leastDistance)
 
 	// --> gives high number for the correct value
-	// lock the correct keysize to test the remaining part
+	// NOTE: lock the correct keysize to test the remaining part
+	//       and fail the test only at the end
 	if leastKeysize != 3 {
 		t.Error("failed to find the correct keysize 3, got", leastKeysize)
 		leastKeysize = 3
@@ -92,14 +94,12 @@ func TestRepeatingKeyXORCipherForBreaking(t *testing.T) {
 	repeatingKey := make([]byte, leastKeysize)
 	for i := 0; i < leastKeysize; i++ {
 		key, score, err := singlecharxorcipher.BreakSingleCharXORCipher(transpose[i])
-		if err != nil {
-			t.Fatal(err)
+		if err != nil || score < 0 {
+			t.Fatal(score, err)
 		}
-		fmt.Printf("got score %v for transpose %v\n", score, i)
 		repeatingKey[i] = key
 	}
 
-	fmt.Printf("guessed key %v and correct is %v\n", repeatingKey, keybytes)
 	if !bytes.Equal(repeatingKey, keybytes) {
 		t.Fatal("key mismatch")
 	}
@@ -113,6 +113,8 @@ func TestRepeatingKeyXORCipherForBreaking(t *testing.T) {
 
 // 6. Break repeating-key XOR
 func TestMetasanoBreakRepeatingKeyXORCipher(t *testing.T) {
+	const expected = "Play that funky music white boy"
+
 	file, err := os.Open("gistfile1.txt")
 	if err != nil {
 		panic(err)
@@ -127,23 +129,16 @@ func TestMetasanoBreakRepeatingKeyXORCipher(t *testing.T) {
 		base64CipherText += lineScanner.Text()
 	}
 
-	//fmt.Printf("Got %v of base64 encoded ciphertext\n", len(cipherText))
-	//fmt.Printf("<%v>\n", cipherText)
-
 	base64CipherBytes, err := hex.DecodeString(fmt.Sprintf("%x", base64CipherText))
 	if err != nil {
 		t.Fatal(err)
 	}
 	cipherBytes := base64.ConvertFromBase64(base64CipherBytes)
-	//fmt.Printf("<%x>\n", cipherBytes)
 
 	leastDistance := float32(math.MaxFloat32)
 	leastKeysize := -1
 
-	//fmt.Printf("len cipherBytes = %v \n", len(cipherBytes))
-
 	for keysize := 2; keysize < 40; keysize++ {
-
 		sliceA := cipherBytes[:keysize]
 		sliceB := cipherBytes[keysize : 2*keysize]
 		sliceC := cipherBytes[2*keysize : 3*keysize]
@@ -151,19 +146,9 @@ func TestMetasanoBreakRepeatingKeyXORCipher(t *testing.T) {
 		distance1, _ := CalculateDistance(sliceA, sliceB)
 		distance2, _ := CalculateDistance(sliceB, sliceC)
 		distance3, _ := CalculateDistance(sliceC, sliceD)
+
 		normalizedDistance := float32(distance1+distance2+distance3) / float32(3*keysize)
 		fmt.Printf("keysize %v gives dist %v\n", keysize, normalizedDistance)
-
-		/*
-			sliceA := cipherBytes[:keysize]
-			sliceB := cipherBytes[keysize : 2*keysize]
-			distance, err := CalculateDistance(sliceA, sliceB)
-			if err != nil || distance < 0 {
-				t.Fatal(distance, err)
-			}
-			normalizedDistance := float32(distance) / float32(keysize)
-			fmt.Printf("keysize %v gives dist %v\n", keysize, normalizedDistance)
-		*/
 
 		if normalizedDistance < leastDistance {
 			leastDistance = normalizedDistance
@@ -175,56 +160,42 @@ func TestMetasanoBreakRepeatingKeyXORCipher(t *testing.T) {
 	}
 	fmt.Printf("found keysize %v with dist %v\n", leastKeysize, leastDistance)
 
+	// NOTE: lock the correct keysize to test the remaining part
+	//       and fail the test only at the end
 	if leastKeysize != 29 {
-		t.Fatal("failed to find the correct keysize 29, got", leastKeysize)
+		t.Error("failed to find the correct keysize 29, got", leastKeysize)
+		leastKeysize = 29
 	}
+
 	//e. Now that you probably know the KEYSIZE: break the ciphertext into
 	//blocks of KEYSIZE length.
-
-	for leastKeysize := 2; leastKeysize < 40; leastKeysize++ {
-
-		//f. Now transpose the blocks: make a block that is the first byte of
-		//every block, and a block that is the second byte of every block, and
-		//so on.
-		transpose := make(map[int][]byte)
-		for i, v := range cipherBytes {
-			transpose[i%leastKeysize] = append(transpose[i%leastKeysize], v)
-		}
-		//fmt.Printf("transpose is %v\n", transpose)
-
-		//g. Solve each block as if it was single-character XOR.
-		//You already have code to do this.
-		repeatingKey := make([]byte, leastKeysize)
-		for i := 0; i < leastKeysize; i++ {
-			key, score, err := singlecharxorcipher.BreakSingleCharXORCipher(transpose[i])
-			if err != nil {
-				t.Fatal(err)
-			}
-			fmt.Printf("got score %v for transpose %v\n", score, i)
-			repeatingKey[i] = key
-		}
-		// TRY: 5(1,2), 3(2), 2(2,5), 13(2,5384614)
-
-		//e. For each block, the single-byte XOR key that produces the best
-		//looking histogram is the repeating-key XOR key byte for that
-		//block. Put them together and you have the key.
-
-		out := EncodeRepeatingKeyXORCipher(cipherBytes, repeatingKey)
-
-		//fmt.Printf("%v\n%v", out, fmt.Sprintf("%s", out))
-		fmt.Printf("\n\n\n\n\nleastKeysize %v\n", leastKeysize)
-		fmt.Printf("%v\n", fmt.Sprintf("%s", out))
-		//fmt.Println(hex.EncodeToString(out))
+	//f. Now transpose the blocks: make a block that is the first byte of
+	//every block, and a block that is the second byte of every block, and
+	//so on.
+	transpose := make(map[int][]byte)
+	for i, v := range cipherBytes {
+		transpose[i%leastKeysize] = append(transpose[i%leastKeysize], v)
 	}
-	t.Fatal("BOOM")
 
-	//if hex.EncodeToString(out) != expected {
-	//	t.Errorf("%v (len %v)", out, len(out))
-	//}
+	//g. Solve each block as if it was single-character XOR.
+	//You already have code to do this.
+	repeatingKey := make([]byte, leastKeysize)
+	for i := 0; i < leastKeysize; i++ {
+		key, score, err := singlecharxorcipher.BreakSingleCharXORCipher(transpose[i])
+		if err != nil || score < 0 {
+			t.Fatal(score, err)
+		}
+		repeatingKey[i] = key
+	}
 
-	//if strings.TrimSpace(topResult) != "Now that the party is jumping" {
-	//	t.Errorf("%v (len %v)", topResult, len(topResult))
-	//}
+	//e. For each block, the single-byte XOR key that produces the best
+	//looking histogram is the repeating-key XOR key byte for that
+	//block. Put them together and you have the key.
+	plainBytes := EncodeRepeatingKeyXORCipher(cipherBytes, repeatingKey)
+
+	if !strings.Contains(fmt.Sprintf("%s", plainBytes), expected) {
+		t.Fatal("could not find expected plaintext string")
+	}
 
 }
 
