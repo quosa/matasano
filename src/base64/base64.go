@@ -17,50 +17,41 @@ and base64 for pretty-printing.
 */
 package base64
 
-import "encoding/hex"
-
-func ConvertToBase64(hexstring string) string {
+func ConvertToBase64(inbytes []byte) []byte {
 	const caps = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	const lows = "abcdefghijklmnopqrstuvwxyz"
 	const nums = "0123456789"
 	const rest = "+/"
 	const base64output = caps + lows + nums + rest
 
-	var out string = ""
+	outbytes := make([]byte, 0)
 
-	data, err := hex.DecodeString(hexstring)
-	if err != nil {
-		panic(err)
-	}
-
-	padding := len(data) % 3
+	padding := len(inbytes) % 3
 	switch padding {
 	case 1:
-		data = append(data, byte(0x00), byte(0x00))
+		inbytes = append(inbytes, byte(0x00), byte(0x00))
 	case 2:
-		data = append(data, byte(0x00))
+		inbytes = append(inbytes, byte(0x00))
 	}
-	for len(data) >= 3 {
-		h := data[0] >> 2
-		i := (data[0]&byte(0x03))<<4 + data[1]>>4
-		j := (data[1]&byte(0x0f))<<2 + data[2]&byte(0xc0)>>6
-		k := data[2] & byte(0x3f)
-		out += string(base64output[h])
-		out += string(base64output[i])
-		out += string(base64output[j])
-		out += string(base64output[k])
-		data = data[3:]
+	for len(inbytes) >= 3 {
+		h := inbytes[0] >> 2
+		i := (inbytes[0]&byte(0x03))<<4 + inbytes[1]>>4
+		j := (inbytes[1]&byte(0x0f))<<2 + inbytes[2]&byte(0xc0)>>6
+		k := inbytes[2] & byte(0x3f)
+		outbytes = append(outbytes, base64output[h], base64output[i], base64output[j], base64output[k])
+		inbytes = inbytes[3:]
 	}
 	switch padding {
 	case 1:
-		out = out[:len(out)-2] + "=="
+		outbytes[len(outbytes)-2] = 0x3d // '='
+		outbytes[len(outbytes)-1] = 0x3d // '='
 	case 2:
-		out = out[:len(out)-1] + "="
+		outbytes[len(outbytes)-1] = 0x3d // '='
 	}
-	return out
+	return outbytes
 }
 
-func ConvertFromBase64(base64 string) string {
+func ConvertFromBase64(base64bytes []byte) []byte {
 	const caps = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	const lows = "abcdefghijklmnopqrstuvwxyz"
 	const nums = "0123456789"
@@ -72,27 +63,29 @@ func ConvertFromBase64(base64 string) string {
 		base64input[v] = byte(i)
 	} // NOTE: = -> \0 is implicit
 
-	var out string = ""
+	outbytes := make([]byte, 0)
 	var chop int = 0
-	if len(base64) > 0 && string(base64[len(base64)-1]) == "=" {
+	base64len := len(base64bytes)
+	if base64len > 2 && string(base64bytes[base64len-1]) == "=" {
 		chop = 1
 	}
-	if len(base64) > 0 && string(base64[len(base64)-2]) == "=" {
+	if base64len > 2 && string(base64bytes[base64len-2]) == "=" {
 		chop = 2
 	}
-	for len(base64) >= 4 {
-		h, i, j, k := base64input[rune(base64[0])],
-			base64input[rune(base64[1])],
-			base64input[rune(base64[2])],
-			base64input[rune(base64[3])]
+
+	for len(base64bytes) >= 4 {
+		h, i, j, k := base64input[rune(base64bytes[0])],
+			base64input[rune(base64bytes[1])],
+			base64input[rune(base64bytes[2])],
+			base64input[rune(base64bytes[3])]
 		a := h<<2 + (i&byte(0x30))>>4
 		b := i&byte(0x0f)<<4 + j&byte(0x3c)>>2
 		c := j&byte(0x03)<<6 + k
-		out += string(string(a) + string(b) + string(c))
-		base64 = base64[4:]
+		outbytes = append(outbytes, a, b, c)
+		base64bytes = base64bytes[4:]
 	}
-	if chop > 0 && len(out) > chop {
-		out = out[:len(out)-chop]
+	if chop > 0 && len(outbytes) > chop {
+		outbytes = outbytes[:len(outbytes)-chop]
 	}
-	return out
+	return outbytes
 }

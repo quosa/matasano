@@ -3,6 +3,7 @@ package singlecharxorcipher
 import (
 	"bufio"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -11,15 +12,17 @@ import (
 // 3. Single-character XOR Cipher
 func TestMetasanoDecryptSingleCharXORCipher(t *testing.T) {
 	const ciphertext = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"
-
 	cipherbytes, _ := hex.DecodeString(ciphertext)
 
-	out, score, err := DecryptSingleCharXORCipher(cipherbytes)
+	key, score, err := BreakSingleCharXORCipher(cipherbytes)
 	if err != nil || score < 0 {
 		t.Fatal(err)
 	}
-	if out != "Cooking MC's like a pound of bacon" {
-		t.Errorf("%v (len %v)", out, len(out))
+	outbytes := DecryptSingleCharXORCipher(cipherbytes, key)
+
+	outstring := fmt.Sprintf("%s", outbytes)
+	if outstring != "Cooking MC's like a pound of bacon" {
+		t.Errorf("%v (len %v)", outstring, len(outstring))
 	}
 }
 
@@ -46,13 +49,14 @@ func TestMetasanoFindSingleCharXORCipher(t *testing.T) {
 	topResult := ""
 	for lineScanner.Scan() {
 		cipherbytes, _ := hex.DecodeString(lineScanner.Text())
-		out, score, err := DecryptSingleCharXORCipher(cipherbytes)
+		key, score, err := BreakSingleCharXORCipher(cipherbytes)
 		if err != nil || score < 0 {
-			t.Fatal(out, err)
+			t.Fatal(key, err)
 		}
 		if score > topScore {
 			topScore = score
-			topResult = out
+			topResult = fmt.Sprintf("%s",
+				DecryptSingleCharXORCipher(cipherbytes, key))
 		}
 	}
 	if topScore < 0 || topResult == "" {

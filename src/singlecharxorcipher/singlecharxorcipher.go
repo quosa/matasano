@@ -19,14 +19,23 @@ package singlecharxorcipher
 
 import "errors"
 
-// DecryptSingleCharXORCipher finds the best
-// English plaintext alternative and returns that
-// together with the score of the alternative or
-// and error. The closer the score is to the
-// ciphertext length the better.
+func DecryptSingleCharXORCipher(ciphertext []byte, key byte) []byte {
+	cipherlen := len(ciphertext)
+	result := make([]byte, cipherlen)
+	for i := 0; i < cipherlen; i++ {
+		result[i] = ciphertext[i] ^ key
+	}
+	return result
+}
+
+// BreakSingleCharXORCipher finds the best
+// English plaintext alternative and returns
+// the key together with the score of the
+// alternative or an error. The closer the
+// score is to the ciphertext length the better.
 // TODO: handle ties and use the unicode library
 //       RangeTables and In() function for scoring
-func DecryptSingleCharXORCipher(ciphertext []byte) (string, int, error) {
+func BreakSingleCharXORCipher(ciphertext []byte) (byte, int, error) {
 	cipherlen := len(ciphertext)
 	topCandidate := -1
 	topScore := -1
@@ -55,12 +64,7 @@ func DecryptSingleCharXORCipher(ciphertext []byte) (string, int, error) {
 		}
 	}
 	if topCandidate < 0 {
-		return "", -1, errors.New("could not detect a proper candidate")
+		return 0x00, -1, errors.New("could not detect a proper candidate")
 	}
-	result := make([]byte, cipherlen)
-	topCandidateByte := byte(topCandidate)
-	for i := 0; i < cipherlen; i++ {
-		result[i] = byte(ciphertext[i] ^ topCandidateByte)
-	}
-	return string(result), topScore, nil
+	return byte(topCandidate), topScore, nil
 }

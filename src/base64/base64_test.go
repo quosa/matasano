@@ -1,6 +1,7 @@
 package base64
 
 import (
+	"encoding/hex"
 	"fmt"
 	"testing"
 )
@@ -26,9 +27,14 @@ var base64testStrings = []struct {
  */
 func TestConvertSampleStringsToBase64(t *testing.T) {
 	for _, test := range base64testStrings {
-		out := ConvertToBase64(fmt.Sprintf("%x", test.in))
-		if out != test.expected {
-			t.Errorf("ConvertToBase64(%v) = %v, want %v", test.in, out, test.expected)
+		inbytes, err := hex.DecodeString(fmt.Sprintf("%x", test.in))
+		if err != nil {
+			t.Fatal(err)
+		}
+		outbytes := ConvertToBase64(inbytes)
+		outstring := fmt.Sprintf("%s", outbytes)
+		if outstring != test.expected {
+			t.Errorf("ConvertToBase64(%v) = %v, want %v", test.in, outstring, test.expected)
 		}
 	}
 }
@@ -37,8 +43,14 @@ func TestConvertSampleStringsToBase64(t *testing.T) {
 func TestConvertSampleHexStringToBase64(t *testing.T) {
 	const in = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"
 	const expected = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"
-	if out := ConvertToBase64(in); out != expected {
-		t.Errorf("ConvertToBase64(%v) = %v, want %v", in, out, expected)
+	inbytes, err := hex.DecodeString(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outbytes := ConvertToBase64(inbytes)
+	outstring := fmt.Sprintf("%s", outbytes)
+	if outstring != expected {
+		t.Errorf("ConvertToBase64(%v) = %v, want %v", in, outstring, expected)
 	}
 }
 
@@ -47,18 +59,49 @@ func TestConvertSampleHexStringToBase64(t *testing.T) {
  */
 func TestConvertBase64ToString(t *testing.T) {
 	for _, test := range base64testStrings {
-		out := ConvertFromBase64(test.expected)
-		if out != test.in {
-			t.Errorf("ConvertFromBase64(%v) = %v, want %v", test.expected, out, test.in)
+
+		inbytes, err := hex.DecodeString(fmt.Sprintf("%x", test.expected))
+		if err != nil {
+			t.Fatal(err)
+		}
+		outbytes := ConvertFromBase64(inbytes)
+		outstring := fmt.Sprintf("%s", outbytes)
+		if outstring != test.in {
+			t.Errorf("ConvertFromBase64(%v) = %v, want %v", test.expected, outstring, test.in)
 		}
 	}
 }
 
 // from the matasano assignment
 func TestConvertSampleBase64ToHexString(t *testing.T) {
-	const in = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"
+	const cipher = "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"
 	const expected = "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d"
-	if out := ConvertFromBase64(in); fmt.Sprintf("%x", out) != expected {
-		t.Errorf("ConvertFromBase64(%v) = %v, want %v", in, out, expected)
+	cipherbytes, err := hex.DecodeString(fmt.Sprintf("%x", cipher))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outbytes := ConvertFromBase64(cipherbytes)
+
+	outhex := fmt.Sprintf("%x", outbytes)
+	if outhex != expected {
+		t.Errorf("ConvertFromBase64(%v) = %v, want %v", cipher, outhex, expected)
+	}
+}
+
+func TestConvertSinglePaddedBase64ToHexString(t *testing.T) {
+	const cipher = "bGVhc3VyZS4="
+	const expected = "leasure."
+	cipherbytes, err := hex.DecodeString(fmt.Sprintf("%x", cipher))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outbytes := ConvertFromBase64(cipherbytes)
+
+	outstring := fmt.Sprintf("%s", outbytes)
+	if outstring != expected {
+		t.Errorf("ConvertFromBase64(%v) = %v (%v), want %v (%v)",
+			cipher, outstring, len(outstring), expected, len(expected))
 	}
 }
